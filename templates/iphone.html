@@ -127,6 +127,12 @@
       color: #334155;
       font-size: 14px;
     }
+    .warn {
+      margin-top: 8px;
+      color: #b45309;
+      font-size: 13px;
+      line-height: 1.4;
+    }
     .log {
       margin-top: 12px;
       border: 1px solid #e2e8f0;
@@ -176,6 +182,7 @@
         <button type="button" id="clearJa" class="ghost">削除</button>
       </div>
       <p>入力欄をタップして、iPhoneキーボードのマイクで音声入力してください。</p>
+      <p class="warn">입력 전에 iPhone 키보드를 일본어로 전환하세요. (지구본 키 길게 누르기)</p>
       <textarea id="jaText" placeholder="ここに日本語の音声入力結果を入れてください。"></textarea>
       <div class="btn-row" style="margin-top: 10px;">
         <button type="button" id="translateJaToKoBtn" class="primary">번역</button>
@@ -226,6 +233,14 @@
       el.value = '';
     }
 
+    function containsHangul(text) {
+      return /[\u3131-\u318E\uAC00-\uD7A3]/.test(text);
+    }
+
+    function containsJapanese(text) {
+      return /[\u3040-\u30FF\u4E00-\u9FFF]/.test(text);
+    }
+
     async function requestTranslation(text, source, target) {
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -268,6 +283,17 @@
     speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR'));
     speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP'));
 
+    jaText.addEventListener('focus', () => {
+      setStatus('안내: 일본어 칸은 일본어 키보드(지구본 키)로 전환 후 입력하세요.');
+    });
+
+    jaText.addEventListener('input', () => {
+      const value = jaText.value.trim();
+      if (value && containsHangul(value) && !containsJapanese(value)) {
+        setStatus('주의: 일본어 칸에 한글이 감지되었습니다. 일본어 키보드 상태를 확인하세요.');
+      }
+    });
+
     // Korean → Japanese translation
     translateKoToJaBtn.addEventListener('click', async () => {
       const ko = koText.value.trim();
@@ -299,6 +325,14 @@
       if (!ja) {
         setStatus('일본어 문장을 입력하세요.');
         return;
+      }
+
+      if (containsHangul(ja) && !containsJapanese(ja)) {
+        const proceed = confirm('일본어 칸에 한글이 감지되었습니다. 일본어 키보드로 입력했는지 확인 후 계속하시겠습니까?');
+        if (!proceed) {
+          setStatus('번역 취소: 일본어 키보드 전환 후 다시 시도하세요.');
+          return;
+        }
       }
 
       translateJaToKoBtn.disabled = true;
