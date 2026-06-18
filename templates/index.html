@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KR-JP Voice Meeting Translator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", "Malgun Gothic", "Segoe UI", sans-serif;
+      background: linear-gradient(140deg, #eff6ff 0%, #f8fafc 45%, #ecfeff 100%);
+      color: #0f172a;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+    .desc {
+      margin: 0 0 20px;
+      color: #334155;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    .card p {
+      margin: 0 0 12px;
+      color: #475569;
+      font-size: 14px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      background: #1d4ed8;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.alt {
+      background: #334155;
+    }
+    button.ghost {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    button.primary-wide {
+      flex: 1;
+      min-width: 140px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      line-height: 1.45;
+      font-family: inherit;
+    }
+    .status {
+      margin-top: 18px;
+      font-size: 14px;
+      color: #334155;
+      min-height: 22px;
+    }
+    .log {
+      margin-top: 14px;
+      padding: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      min-height: 70px;
+      font-size: 13px;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>한일 회의 음성 번역</h1>
+    <p class="desc">각자 말한 뒤 번역 버튼을 누르면 서로 언어로 번역되고 음성으로 재생됩니다.</p>
+    <div class="btn-row" style="margin-bottom: 14px;">
+      <a href="/iphone" style="display:inline-flex; align-items:center; text-decoration:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1;">iPhone 전용 버전 열기</a>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="btn-row" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h2 style="margin: 0;">한국어 화자</h2>
+          <button id="clearKo" class="ghost">텍스트 지우기</button>
+        </div>
+        <p>음성 인식 언어: 한국어 (ko-KR)</p>
+        <div class="btn-row">
+          <button id="startKo">한국어 듣기 시작</button>
+          <button id="stopKo" class="alt">중지</button>
+        </div>
+        <textarea id="koText" placeholder="여기에 한국어 음성 인식 결과가 들어갑니다."></textarea>
+        <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
+          <button id="translateKoBtn" class="primary-wide">번역</button>
+        </div>
+        <textarea id="koToJa" placeholder="한국어 발화가 일본어로 번역됩니다." readonly></textarea>
+        <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
+          <button id="speakJaBtn" class="alt">日本語結果を読む</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="btn-row" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h2 style="margin: 0;">日本語話者</h2>
+          <button id="clearJa" class="ghost">テキスト削除</button>
+        </div>
+        <p>音声認識言語: 日本語 (ja-JP)</p>
+        <div class="btn-row">
+          <button id="startJa">日本語の音声入力開始</button>
+          <button id="stopJa" class="alt">停止</button>
+        </div>
+        <textarea id="jaText" placeholder="ここに日本語の音声認識結果が表示されます。"></textarea>
+        <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
+          <button id="translateJaBtn" class="primary-wide">번역</button>
+        </div>
+        <textarea id="jaToKo" placeholder="일본어 발화가 한국어로 번역됩니다." readonly></textarea>
+        <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
+          <button id="speakKoBtn" class="alt">한국어 결과 읽기</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="btn-row" style="margin-bottom: 0;">
+        <button id="clearAll" class="ghost">전체 지우기</button>
+      </div>
+      <p class="status" id="status">대기 중</p>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const koText = document.getElementById('koText');
+    const jaText = document.getElementById('jaText');
+    const koToJa = document.getElementById('koToJa');
+    const jaToKo = document.getElementById('jaToKo');
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+
+    const startKo = document.getElementById('startKo');
+    const stopKo = document.getElementById('stopKo');
+    const clearKo = document.getElementById('clearKo');
+
+    const startJa = document.getElementById('startJa');
+    const stopJa = document.getElementById('stopJa');
+    const clearJa = document.getElementById('clearJa');
+
+    const translateKoBtn = document.getElementById('translateKoBtn');
+    const translateJaBtn = document.getElementById('translateJaBtn');
+    const speakKoBtn = document.getElementById('speakKoBtn');
+    const speakJaBtn = document.getElementById('speakJaBtn');
+    const clearAll = document.getElementById('clearAll');
+
+    let koRecognition = null;
+    let jaRecognition = null;
+
+    function appendLog(line) {
+      const now = new Date();
+      const stamp = now.toLocaleTimeString();
+      logEl.textContent += `[${stamp}] ${line}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function createRecognizer(lang, outputEl, label) {
+      if (!SpeechRecognition) {
+        return null;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = lang;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let finalText = '';
+        let interim = '';
+        for (let i = 0; i < event.results.length; i += 1) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += transcript + ' ';
+          } else {
+            interim += transcript;
+          }
+        }
+        const base = outputEl.dataset.finalText || '';
+        outputEl.value = (base + finalText + interim).trim();
+        if (finalText.trim()) {
+          outputEl.dataset.finalText = (base + finalText).trim() + ' ';
+        }
+      };
+
+      recognition.onstart = () => {
+        setStatus(`${label} 음성 인식 중...`);
+      };
+
+      recognition.onend = () => {
+        setStatus(`${label} 음성 인식 대기`);
+      };
+
+      recognition.onerror = (event) => {
+        setStatus(`${label} 음성 인식 오류: ${event.error}`);
+        appendLog(`${label} STT 오류: ${event.error}`);
+      };
+
+      return recognition;
+    }
+
+    async function requestTranslation(text, source, target) {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, source, target })
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'translation failed');
+      }
+      return payload.translated_text || '';
+    }
+
+    function speakText(text, lang) {
+      if (!text || !window.speechSynthesis) {
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      if (preferred) {
+        utterance.voice = preferred;
+      }
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function clearTextArea(el) {
+      el.value = '';
+      el.dataset.finalText = '';
+    }
+
+    async function ensureMicPermission() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('브라우저가 마이크 권한 API를 지원하지 않습니다.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    if (!SpeechRecognition) {
+      setStatus('이 브라우저는 Web Speech API를 지원하지 않습니다. Chrome/Edge를 권장합니다.');
+      appendLog('브라우저가 음성 인식을 지원하지 않습니다.');
+      startKo.disabled = true;
+      stopKo.disabled = true;
+      startJa.disabled = true;
+      stopJa.disabled = true;
+    } else {
+      koRecognition = createRecognizer('ko-KR', koText, '한국어');
+      jaRecognition = createRecognizer('ja-JP', jaText, '일본어');
+
+      startKo.addEventListener('click', async () => {
+        try {
+          await ensureMicPermission();
+          koRecognition.start();
+        } catch (error) {
+          if (error && error.name === 'InvalidStateError') {
+            return;
+          }
+          const msg = error?.message || '알 수 없는 오류';
+          setStatus(`한국어 음성 인식 시작 실패: ${msg}`);
+          appendLog(`한국어 STT 시작 실패: ${msg}`);
+        }
+      });
+      stopKo.addEventListener('click', () => {
+        koRecognition.stop();
+      });
+
+      startJa.addEventListener('click', async () => {
+        try {
+          await ensureMicPermission();
+          jaRecognition.start();
+        } catch (error) {
+          if (error && error.name === 'InvalidStateError') {
+            return;
+          }
+          const msg = error?.message || '알 수 없는 오류';
+          setStatus(`일본어 음성 인식 시작 실패: ${msg}`);
+          appendLog(`일본어 STT 시작 실패: ${msg}`);
+        }
+      });
+      stopJa.addEventListener('click', () => {
+        jaRecognition.stop();
+      });
+    }
+
+    clearKo.addEventListener('click', () => clearTextArea(koText));
+    clearJa.addEventListener('click', () => clearTextArea(jaText));
+
+    clearAll.addEventListener('click', () => {
+      clearTextArea(koText);
+      clearTextArea(jaText);
+      clearTextArea(koToJa);
+      clearTextArea(jaToKo);
+      logEl.textContent = '';
+      setStatus('초기화 완료');
+    });
+
+    speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR'));
+    speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP'));
+
+    translateKoBtn.addEventListener('click', async () => {
+      const ko = koText.value.trim();
+      if (!ko) {
+        setStatus('번역할 한국어 텍스트가 없습니다.');
+        return;
+      }
+
+      setStatus('한국어 -> 일본어 번역 중...');
+      translateKoBtn.disabled = true;
+
+      try {
+        const translated = await requestTranslation(ko, 'ko', 'ja');
+        koToJa.value = translated;
+        appendLog(`KR -> JP: ${translated}`);
+        speakText(translated, 'ja-JP');
+        setStatus('번역 완료');
+      } catch (error) {
+        setStatus(`오류: ${error.message}`);
+        appendLog(`번역 오류: ${error.message}`);
+      } finally {
+        translateKoBtn.disabled = false;
+      }
+    });
+
+    translateJaBtn.addEventListener('click', async () => {
+      const ja = jaText.value.trim();
+      if (!ja) {
+        setStatus('번역할 일본어 텍스트가 없습니다.');
+        return;
+      }
+
+      setStatus('일본어 -> 한국어 번역 중...');
+      translateJaBtn.disabled = true;
+
+      try {
+        const translated = await requestTranslation(ja, 'ja', 'ko');
+        jaToKo.value = translated;
+        appendLog(`JP -> KR: ${translated}`);
+        speakText(translated, 'ko-KR');
+        setStatus('번역 완료');
+      } catch (error) {
+        setStatus(`오류: ${error.message}`);
+        appendLog(`번역 오류: ${error.message}`);
+      } finally {
+        translateJaBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

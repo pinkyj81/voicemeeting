@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>iPhone KR-JP Meeting Translator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #edf6ff 0%, #f8fbff 55%, #eefcfb 100%);
+      color: #0f172a;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 18px 14px 32px;
+    }
+    .hero {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #cfe2ff;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 16px 28px rgba(15, 23, 42, 0.06);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+    .desc {
+      margin: 0;
+      color: #475569;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .tip {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .card {
+      margin-top: 16px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #dbeafe;
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    .card p {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.5;
+    }
+    textarea {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 14px;
+      font-size: 17px;
+      line-height: 1.5;
+      font-family: inherit;
+      background: #fff;
+      color: #0f172a;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    button, a.btn {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+    }
+    .primary {
+      background: #1d4ed8;
+      color: #fff;
+      flex: 1;
+      min-width: 120px;
+    }
+    .dark {
+      background: #334155;
+      color: #fff;
+    }
+    .ghost {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .outline {
+      background: #fff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .translate-box {
+      margin-top: 16px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 16px;
+    }
+    .status {
+      margin-top: 12px;
+      min-height: 22px;
+      color: #334155;
+      font-size: 14px;
+    }
+    .log {
+      margin-top: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 12px;
+      min-height: 68px;
+      color: #475569;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>아이폰용 한일 회의 번역</h1>
+      <p class="desc">Safari에서는 브라우저 음성인식 버튼이 제한되므로, iPhone 키보드의 마이크 받아쓰기를 사용한 뒤 번역하는 방식으로 구성했습니다.</p>
+      <div class="tip">사용 방법: 입력칸을 터치 → iPhone 키보드 마이크로 말하기 → 번역 버튼 → 상대 언어로 번역 + 음성 재생</div>
+      <div class="btn-row">
+        <a class="btn outline" href="/">PC/브라우저용 화면</a>
+      </div>
+    </section>
+
+    <!-- 1️⃣ Korean Section (입력 + KR→JP 번역) -->
+    <section class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin: 0;">한국어 화자 입력</h2>
+        <button type="button" id="clearKo" class="ghost">지우기</button>
+      </div>
+      <p>입력칸을 누른 뒤 iPhone 키보드의 마이크 버튼으로 받아쓰기하세요.</p>
+      <textarea id="koText" placeholder="여기에 한국어 받아쓰기 결과를 입력하세요."></textarea>
+      <div class="btn-row" style="margin-top: 10px;">
+        <button type="button" id="translateKoToJaBtn" class="primary">번역</button>
+      </div>
+
+      <textarea id="koToJa" placeholder="한국어 문장이 일본어로 번역됩니다." readonly></textarea>
+      <div class="btn-row">
+        <button type="button" id="speakJaBtn" class="dark">日本語結果を読む</button>
+      </div>
+    </section>
+
+    <!-- 2️⃣ Japanese Section (입력 + JP→KR 번역) -->
+    <section class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin: 0;">日本語話者入力</h2>
+        <button type="button" id="clearJa" class="ghost">削除</button>
+      </div>
+      <p>入力欄をタップして、iPhoneキーボードのマイクで音声入力してください。</p>
+      <textarea id="jaText" placeholder="ここに日本語の音声入力結果を入れてください。"></textarea>
+      <div class="btn-row" style="margin-top: 10px;">
+        <button type="button" id="translateJaToKoBtn" class="primary">번역</button>
+      </div>
+
+      <textarea id="jaToKo" placeholder="일본어 문장이 한국어로 번역됩니다." readonly></textarea>
+      <div class="btn-row">
+        <button type="button" id="speakKoBtn" class="dark">한국어 결과 읽기</button>
+      </div>
+    </section>
+
+    <section class="translate-box">
+      <div class="btn-row">
+        <button type="button" id="clearAll" class="ghost">전체 지우기</button>
+      </div>
+      <p id="status" class="status">대기 중</p>
+      <div id="log" class="log"></div>
+    </section>
+  </div>
+
+  <script>
+    const koText = document.getElementById('koText');
+    const jaText = document.getElementById('jaText');
+    const koToJa = document.getElementById('koToJa');
+    const jaToKo = document.getElementById('jaToKo');
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+
+    const clearKo = document.getElementById('clearKo');
+    const clearJa = document.getElementById('clearJa');
+    const clearAll = document.getElementById('clearAll');
+    const translateKoToJaBtn = document.getElementById('translateKoToJaBtn');
+    const translateJaToKoBtn = document.getElementById('translateJaToKoBtn');
+    const speakKoBtn = document.getElementById('speakKoBtn');
+    const speakJaBtn = document.getElementById('speakJaBtn');
+
+    function appendLog(line) {
+      const stamp = new Date().toLocaleTimeString();
+      logEl.textContent += `[${stamp}] ${line}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function clearTextArea(el) {
+      el.value = '';
+    }
+
+    async function requestTranslation(text, source, target) {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, source, target })
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'translation failed');
+      }
+      return payload.translated_text || '';
+    }
+
+    function speakText(text, lang) {
+      if (!text || !window.speechSynthesis) {
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find((voice) => voice.lang && voice.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      if (preferred) {
+        utterance.voice = preferred;
+      }
+      window.speechSynthesis.speak(utterance);
+    }
+
+    clearKo.addEventListener('click', () => clearTextArea(koText));
+    clearJa.addEventListener('click', () => clearTextArea(jaText));
+    clearAll.addEventListener('click', () => {
+      clearTextArea(koText);
+      clearTextArea(jaText);
+      clearTextArea(koToJa);
+      clearTextArea(jaToKo);
+      logEl.textContent = '';
+      setStatus('초기화 완료');
+    });
+
+    speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR'));
+    speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP'));
+
+    // Korean → Japanese translation
+    translateKoToJaBtn.addEventListener('click', async () => {
+      const ko = koText.value.trim();
+      if (!ko) {
+        setStatus('한국어 문장을 입력하세요.');
+        return;
+      }
+
+      translateKoToJaBtn.disabled = true;
+      setStatus('한국어→일본어 번역 중...');
+
+      try {
+        const translated = await requestTranslation(ko, 'ko', 'ja');
+        koToJa.value = translated;
+        appendLog(`KR -> JP: ${translated}`);
+        speakText(translated, 'ja-JP');
+        setStatus('번역 완료');
+      } catch (error) {
+        setStatus(`오류: ${error.message}`);
+        appendLog(`번역 오류: ${error.message}`);
+      } finally {
+        translateKoToJaBtn.disabled = false;
+      }
+    });
+
+    // Japanese → Korean translation
+    translateJaToKoBtn.addEventListener('click', async () => {
+      const ja = jaText.value.trim();
+      if (!ja) {
+        setStatus('일본어 문장을 입력하세요.');
+        return;
+      }
+
+      translateJaToKoBtn.disabled = true;
+      setStatus('일본어→한국어 번역 중...');
+
+      try {
+        const translated = await requestTranslation(ja, 'ja', 'ko');
+        jaToKo.value = translated;
+        appendLog(`JP -> KR: ${translated}`);
+        speakText(translated, 'ko-KR');
+        setStatus('번역 완료');
+      } catch (error) {
+        setStatus(`오류: ${error.message}`);
+        appendLog(`번역 오류: ${error.message}`);
+      } finally {
+        translateJaToKoBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

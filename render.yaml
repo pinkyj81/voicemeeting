@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: voice-meeting-translator
+    runtime: python312
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DEBUG
+        value: false
+      - key: PYTHON_VERSION
+        value: 3.12.0
