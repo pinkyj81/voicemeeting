@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>회의실 목록 | KR-JP Voice Meeting Translator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", "Malgun Gothic", "Segoe UI", sans-serif;
+      background: linear-gradient(145deg, #eef4ff 0%, #f8fbff 55%, #ecfeff 100%);
+      color: #0f172a;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 30px auto;
+      padding: 0 16px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      letter-spacing: -0.02em;
+    }
+    .desc {
+      margin: 0 0 18px;
+      color: #334155;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #cfe1ff;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+      margin-bottom: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 180px 140px;
+      gap: 10px;
+      align-items: center;
+    }
+    input {
+      width: 100%;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #f8fbff;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button.ghost {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .status {
+      min-height: 20px;
+      color: #334155;
+      font-size: 13px;
+      margin: 2px 0 6px;
+    }
+    .room-list {
+      display: grid;
+      gap: 10px;
+    }
+    .room-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fbff;
+    }
+    .room-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .room-meta {
+      font-size: 13px;
+      color: #475569;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .empty {
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 16px;
+      color: #64748b;
+      background: #f8fafc;
+      text-align: center;
+    }
+    a.enter {
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #334155;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .room-item {
+        grid-template-columns: 1fr;
+      }
+      a.enter {
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>회의실 관리</h1>
+    <p class="desc">회의실 생성 후 목록에서 선택하면 한일 회의 음성 번역 페이지로 입장합니다.</p>
+
+    <section class="card">
+      <h2 style="margin: 0 0 10px; font-size: 20px;">회의실 생성</h2>
+      <div class="grid">
+        <input id="roomName" type="text" placeholder="회의실 이름 (예: 6/19 고객사 회의)">
+        <input id="createdBy" type="text" placeholder="생성자 (선택)">
+        <button id="createRoomBtn">회의실 생성</button>
+      </div>
+      <p class="status" id="createStatus"></p>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2 style="margin: 0; font-size: 20px;">회의실 목록</h2>
+        <button id="refreshBtn" class="ghost">새로고침</button>
+      </div>
+      <div id="roomList" class="room-list"></div>
+    </section>
+  </div>
+
+  <script>
+    const roomNameInput = document.getElementById('roomName');
+    const createdByInput = document.getElementById('createdBy');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const createStatus = document.getElementById('createStatus');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const roomList = document.getElementById('roomList');
+
+    function setCreateStatus(text, isError = false) {
+      createStatus.textContent = text;
+      createStatus.style.color = isError ? '#b91c1c' : '#334155';
+    }
+
+    function renderRooms(rooms) {
+      if (!rooms.length) {
+        roomList.innerHTML = '<div class="empty">생성된 회의실이 없습니다. 상단에서 먼저 회의실을 만들어주세요.</div>';
+        return;
+      }
+
+      roomList.innerHTML = rooms.map((room) => {
+        const createdBy = room.created_by ? `생성자: ${escapeHtml(room.created_by)}` : '생성자: -';
+        const createdAt = room.created_at ? `생성일시: ${escapeHtml(room.created_at)}` : '';
+        return `
+          <div class="room-item">
+            <div>
+              <div class="room-title">${escapeHtml(room.room_name)} <span style="font-size:13px; color:#475569;">(#${escapeHtml(room.room_code)})</span></div>
+              <div class="room-meta">
+                <span>${createdBy}</span>
+                <span>${createdAt}</span>
+              </div>
+            </div>
+            <a class="enter" href="/meeting/${encodeURIComponent(room.room_code)}">입장하기</a>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    async function loadRooms() {
+      roomList.innerHTML = '<div class="empty">회의실 목록을 불러오는 중...</div>';
+      try {
+        const response = await fetch('/api/rooms');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || '회의실 목록을 불러오지 못했습니다.');
+        }
+        renderRooms(data.rooms || []);
+      } catch (error) {
+        roomList.innerHTML = `<div class="empty" style="color:#b91c1c;">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function createRoom() {
+      const roomName = roomNameInput.value.trim();
+      const createdBy = createdByInput.value.trim();
+
+      if (!roomName) {
+        setCreateStatus('회의실 이름을 입력해주세요.', true);
+        roomNameInput.focus();
+        return;
+      }
+
+      createRoomBtn.disabled = true;
+      setCreateStatus('회의실 생성 중...');
+
+      try {
+        const response = await fetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room_name: roomName, created_by: createdBy })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || '회의실 생성 실패');
+        }
+
+        setCreateStatus(`생성 완료: #${data.room_code} ${data.room_name}`);
+        roomNameInput.value = '';
+        await loadRooms();
+      } catch (error) {
+        setCreateStatus(error.message || '회의실 생성 실패', true);
+      } finally {
+        createRoomBtn.disabled = false;
+      }
+    }
+
+    createRoomBtn.addEventListener('click', createRoom);
+    refreshBtn.addEventListener('click', loadRooms);
+    roomNameInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') createRoom();
+    });
+
+    loadRooms();
+  </script>
+</body>
+</html>

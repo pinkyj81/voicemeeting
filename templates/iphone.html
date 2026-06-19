@@ -144,6 +144,106 @@
       font-size: 13px;
       white-space: pre-wrap;
     }
+    .room-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      margin-bottom: 10px;
+    }
+    .room-status {
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 10px;
+    }
+    .chat-room {
+      background: #f7f7f8;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 10px;
+      min-height: 210px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .chat-date-line {
+      text-align: center;
+      color: #334155;
+      font-size: 12px;
+      margin: 8px 0 12px;
+    }
+    .chat-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+    .chat-row.right {
+      justify-content: flex-end;
+    }
+    .chat-bubble-wrap {
+      display: flex;
+      flex-direction: column;
+      max-width: 74%;
+    }
+    .chat-row.right .chat-bubble-wrap {
+      margin-left: auto;
+      align-items: flex-end;
+    }
+    .chat-row.left .chat-bubble-wrap {
+      align-items: flex-start;
+    }
+    .chat-meta {
+      font-size: 11px;
+      color: #1e293b;
+    }
+    .chat-name {
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .chat-bubble {
+      max-width: 74%;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+    }
+    .chat-row.right .chat-bubble {
+      background: #cfe8ff;
+      color: #0f172a;
+      border-top-right-radius: 4px;
+    }
+    .chat-row.left .chat-bubble {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid #e5e7eb;
+      border-top-left-radius: 4px;
+    }
+    .chat-translation {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #93c5fd;
+      color: #334155;
+      font-size: 12px;
+    }
+    .chat-row.left .chat-translation {
+      border-top: 1px dashed #d1d5db;
+      color: #4b5563;
+    }
+    .chat-system {
+      text-align: center;
+      font-size: 12px;
+      color: #4b5563;
+      margin: 10px 0;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #eef2f7;
+    }
   </style>
 </head>
 <body>
@@ -195,11 +295,17 @@
     </section>
 
     <section class="translate-box">
-      <div class="btn-row">
-        <button type="button" id="clearAll" class="ghost">전체 지우기</button>
+      <h2 style="margin: 0 0 6px; font-size: 20px;">회의실 대화창</h2>
+      <p style="margin: 0 0 8px; color: #475569; font-size: 13px;">입장한 시간 동안 번역된 문장을 카톡 스타일로 누적 표시합니다.</p>
+      <div class="room-controls">
+        <button type="button" id="enterRoomBtn" class="primary">회의실 입장</button>
+        <button type="button" id="leaveRoomBtn" class="dark" disabled>회의실 퇴장</button>
+        <button type="button" id="clearRoomChatBtn" class="ghost">대화 지우기</button>
       </div>
-      <p id="status" class="status">대기 중</p>
-      <div id="log" class="log"></div>
+      <div class="room-status" id="roomStatus">현재 회의실 밖입니다.</div>
+      <div class="chat-room" id="roomChat">
+        <div class="chat-date-line" id="roomDateLine">회의실에 입장하면 대화가 표시됩니다.</div>
+      </div>
     </section>
   </div>
 
@@ -209,24 +315,115 @@
     const koToJa = document.getElementById('koToJa');
     const jaToKo = document.getElementById('jaToKo');
     const statusEl = document.getElementById('status');
-    const logEl = document.getElementById('log');
 
     const clearKo = document.getElementById('clearKo');
     const clearJa = document.getElementById('clearJa');
-    const clearAll = document.getElementById('clearAll');
     const translateKoToJaBtn = document.getElementById('translateKoToJaBtn');
     const translateJaToKoBtn = document.getElementById('translateJaToKoBtn');
     const speakKoBtn = document.getElementById('speakKoBtn');
     const speakJaBtn = document.getElementById('speakJaBtn');
+    const enterRoomBtn = document.getElementById('enterRoomBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const clearRoomChatBtn = document.getElementById('clearRoomChatBtn');
+    const roomStatus = document.getElementById('roomStatus');
+    const roomChat = document.getElementById('roomChat');
+    const roomDateLine = document.getElementById('roomDateLine');
+    let roomSessionStartAt = null;
 
-    function appendLog(line) {
-      const stamp = new Date().toLocaleTimeString();
-      logEl.textContent += `[${stamp}] ${line}\n`;
-      logEl.scrollTop = logEl.scrollHeight;
+    function formatClock(date) {
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
     }
 
+    function formatDateLine(date) {
+      return date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'short'
+      });
+    }
+
+    function toSpeechLang(langOrCode) {
+      const value = String(langOrCode || '').toLowerCase();
+      if (value.startsWith('ja')) {
+        return 'ja-JP';
+      }
+      return 'ko-KR';
+    }
+
+    function isInMeetingRoom() {
+      return roomSessionStartAt !== null;
+    }
+
+    function appendSystemMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'chat-system';
+      div.textContent = text;
+      roomChat.appendChild(div);
+      roomChat.scrollTop = roomChat.scrollHeight;
+    }
+
+    function appendRoomMessage({ side, name, originalText, translatedText, source, target }) {
+      if (!isInMeetingRoom()) {
+        return;
+      }
+
+      const row = document.createElement('div');
+      row.className = `chat-row ${side}`;
+
+      const bubbleWrap = document.createElement('div');
+      bubbleWrap.className = 'chat-bubble-wrap';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'chat-name';
+      nameDiv.textContent = name;
+      bubbleWrap.appendChild(nameDiv);
+
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      bubble.textContent = originalText;
+      bubble.style.cursor = 'pointer';
+      bubble.title = '원문 듣기';
+      bubble.addEventListener('click', () => {
+        speakText(originalText, toSpeechLang(source));
+      });
+      bubbleWrap.appendChild(bubble);
+
+      if (translatedText) {
+        const translation = document.createElement('div');
+        translation.className = 'chat-translation';
+        translation.textContent = translatedText;
+        translation.style.cursor = 'pointer';
+        translation.title = '번역문 듣기';
+        translation.addEventListener('click', (event) => {
+          event.stopPropagation();
+          speakText(translatedText, toSpeechLang(target));
+        });
+        bubble.appendChild(translation);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'chat-meta';
+      meta.textContent = formatClock(new Date());
+
+      if (side === 'right') {
+        row.appendChild(meta);
+        row.appendChild(bubbleWrap);
+      } else {
+        row.appendChild(bubbleWrap);
+        row.appendChild(meta);
+      }
+
+      roomChat.appendChild(row);
+      roomChat.scrollTop = roomChat.scrollHeight;
+    }
+
+    function appendLog() {}
+
     function setStatus(text) {
-      statusEl.textContent = text;
+      if (statusEl) {
+        statusEl.textContent = text;
+      }
     }
 
     function clearTextArea(el) {
@@ -254,6 +451,38 @@
       return payload.translated_text || '';
     }
 
+    function getPreferredVoice(lang) {
+      if (!window.speechSynthesis) {
+        return null;
+      }
+      const voices = window.speechSynthesis.getVoices() || [];
+      if (!voices.length) {
+        return null;
+      }
+
+      const target = String(lang || '').toLowerCase();
+      const langPrefix = target.split('-')[0];
+      const keywordMap = {
+        'ja-jp': ['japanese', 'japan', 'ja-jp', 'kyoko', 'otoya', 'haruka', 'nanami'],
+        'ko-kr': ['korean', 'korea', 'ko-kr', 'seoyeon', 'sunhi', 'jihun']
+      };
+      const keywords = keywordMap[target] || [];
+
+      const exact = voices.filter((v) => (v.lang || '').toLowerCase() === target);
+      if (exact.length) {
+        const byKeyword = exact.find((v) => keywords.some((k) => (v.name || '').toLowerCase().includes(k)));
+        return byKeyword || exact[0];
+      }
+
+      const samePrefix = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(`${langPrefix}-`) || (v.lang || '').toLowerCase() === langPrefix);
+      if (samePrefix.length) {
+        const byKeyword = samePrefix.find((v) => keywords.some((k) => (v.name || '').toLowerCase().includes(k)));
+        return byKeyword || samePrefix[0];
+      }
+
+      return null;
+    }
+
     function speakText(text, lang) {
       if (!text || !window.speechSynthesis) {
         return;
@@ -261,23 +490,53 @@
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find((voice) => voice.lang && voice.lang.toLowerCase().startsWith(lang.toLowerCase()));
-      if (preferred) {
-        utterance.voice = preferred;
+      const preferredVoice = getPreferredVoice(lang);
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
       }
       window.speechSynthesis.speak(utterance);
     }
 
+    if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        window.speechSynthesis.getVoices();
+      });
+    }
+
     clearKo.addEventListener('click', () => clearTextArea(koText));
     clearJa.addEventListener('click', () => clearTextArea(jaText));
-    clearAll.addEventListener('click', () => {
-      clearTextArea(koText);
-      clearTextArea(jaText);
-      clearTextArea(koToJa);
-      clearTextArea(jaToKo);
-      logEl.textContent = '';
-      setStatus('초기화 완료');
+    enterRoomBtn.addEventListener('click', () => {
+      if (isInMeetingRoom()) {
+        return;
+      }
+      roomSessionStartAt = new Date();
+      roomDateLine.textContent = formatDateLine(roomSessionStartAt);
+      roomStatus.textContent = `입장 시간: ${roomSessionStartAt.toLocaleString('ko-KR')}`;
+      enterRoomBtn.disabled = true;
+      leaveRoomBtn.disabled = false;
+      appendSystemMessage('회의실에 입장했습니다. 지금부터 번역 메시지가 채팅에 표시됩니다.');
+    });
+
+    leaveRoomBtn.addEventListener('click', () => {
+      if (!isInMeetingRoom()) {
+        return;
+      }
+      const leftAt = new Date();
+      const durationMs = leftAt.getTime() - roomSessionStartAt.getTime();
+      const minutes = Math.max(1, Math.round(durationMs / 60000));
+      appendSystemMessage(`회의실에서 퇴장했습니다. 체류 시간 약 ${minutes}분`);
+      roomSessionStartAt = null;
+      roomStatus.textContent = '현재 회의실 밖입니다.';
+      enterRoomBtn.disabled = false;
+      leaveRoomBtn.disabled = true;
+    });
+
+    clearRoomChatBtn.addEventListener('click', () => {
+      roomChat.innerHTML = '';
+      roomDateLine.textContent = isInMeetingRoom()
+        ? formatDateLine(roomSessionStartAt)
+        : '회의실에 입장하면 대화가 표시됩니다.';
+      roomChat.appendChild(roomDateLine);
     });
 
     speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR'));
@@ -309,6 +568,14 @@
         const translated = await requestTranslation(ko, 'ko', 'ja');
         koToJa.value = translated;
         appendLog(`KR -> JP: ${translated}`);
+        appendRoomMessage({
+          side: 'right',
+          name: '한국어 화자',
+          originalText: ko,
+          translatedText: translated,
+          source: 'ko',
+          target: 'ja'
+        });
         speakText(translated, 'ja-JP');
         setStatus('번역 완료');
       } catch (error) {
@@ -342,6 +609,14 @@
         const translated = await requestTranslation(ja, 'ja', 'ko');
         jaToKo.value = translated;
         appendLog(`JP -> KR: ${translated}`);
+        appendRoomMessage({
+          side: 'left',
+          name: '日本語話者',
+          originalText: ja,
+          translatedText: translated,
+          source: 'ja',
+          target: 'ko'
+        });
         speakText(translated, 'ko-KR');
         setStatus('번역 완료');
       } catch (error) {
