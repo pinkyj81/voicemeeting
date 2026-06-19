@@ -21,6 +21,13 @@ def get_db_connection():
     return pyodbc.connect(conn_str)
 
 
+def normalize_user_name(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "참가자"
+    return text[:40]
+
+
 @app.route("/")
 def lobby():
     return render_template("rooms.html")
@@ -32,6 +39,7 @@ def meeting_page(room_code):
         return "invalid room code", 400
 
     room_name = ""
+    user_name = normalize_user_name(request.args.get("name", ""))
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -51,7 +59,12 @@ def meeting_page(room_code):
     except Exception as exc:
         return f"database error: {exc}", 500
 
-    return render_template("index.html", room_code=room_code, room_name=room_name)
+    return render_template(
+        "index.html",
+        room_code=room_code,
+        room_name=room_name,
+        user_name=user_name,
+    )
 
 
 @app.route("/iphone")
@@ -63,7 +76,8 @@ def iphone():
 def iphone_room(room_code):
     if not re.fullmatch(r"\d{6}", room_code or ""):
         return "invalid room code", 400
-    return render_template("iphone.html", room_code=room_code)
+    user_name = normalize_user_name(request.args.get("name", ""))
+    return render_template("iphone.html", room_code=room_code, user_name=user_name)
 
 
 @app.get("/api/rooms")
@@ -97,6 +111,33 @@ def list_rooms():
         return jsonify({"rooms": rooms})
     except Exception as exc:
         return jsonify({"error": f"failed to load rooms: {exc}"}), 500
+
+
+@app.get("/api/speakers")
+def list_speakers():
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT TOP 200 Name
+                FROM (
+                    SELECT LTRIM(RTRIM(ISNULL(SpeakerName, ''))) AS Name
+                    FROM dbo.MeetingMessages
+                    UNION
+                    SELECT LTRIM(RTRIM(ISNULL(CreatedBy, ''))) AS Name
+                    FROM dbo.MeetingRooms
+                ) Names
+                WHERE Name <> ''
+                ORDER BY Name ASC
+                """
+            )
+            rows = cursor.fetchall()
+
+        names = [row[0] for row in rows]
+        return jsonify({"names": names})
+    except Exception as exc:
+        return jsonify({"error": f"failed to load names: {exc}"}), 500
 
 
 @app.post("/api/rooms")
@@ -186,6 +227,9 @@ def save_message():
                     OriginalText,
                     TranslatedText
                 )
+                OUTPUT
+                    inserted.MessageID,
+                    CONVERT(VARCHAR(19), SWITCHOFFSET(inserted.MessageAt, '+09:00'), 120) AS MessageAt
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 room_id,
@@ -195,9 +239,16 @@ def save_message():
                 original_text,
                 (translated_text or None),
             )
+            inserted = cursor.fetchone()
             conn.commit()
 
-        return jsonify({"saved": True})
+        return jsonify(
+            {
+                "saved": True,
+                "message_id": inserted[0] if inserted else None,
+                "message_at": inserted[1] if inserted else None,
+            }
+        )
     except Exception as exc:
         return jsonify({"error": f"failed to save message: {exc}"}), 500
 

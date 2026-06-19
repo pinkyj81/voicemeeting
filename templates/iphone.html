@@ -204,6 +204,7 @@
       color: #1e293b;
     }
     .chat-bubble {
+      min-width: 120px;
       max-width: 74%;
       border-radius: 12px;
       padding: 8px 10px;
@@ -310,6 +311,7 @@
   </div>
 
   <script>
+    const currentUserName = '{{ user_name or "참가자" }}';
     const koText = document.getElementById('koText');
     const jaText = document.getElementById('jaText');
     const koToJa = document.getElementById('koToJa');
@@ -570,7 +572,7 @@
         appendLog(`KR -> JP: ${translated}`);
         appendRoomMessage({
           side: 'right',
-          name: '한국어 화자',
+          name: currentUserName,
           originalText: ko,
           translatedText: translated,
           source: 'ko',
@@ -611,7 +613,7 @@
         appendLog(`JP -> KR: ${translated}`);
         appendRoomMessage({
           side: 'left',
-          name: '日本語話者',
+          name: currentUserName,
           originalText: ja,
           translatedText: translated,
           source: 'ja',

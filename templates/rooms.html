@@ -122,6 +122,50 @@
       font-size: 13px;
       white-space: nowrap;
     }
+    .name-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+    .name-modal.show {
+      display: flex;
+    }
+    .name-modal-card {
+      width: min(460px, 100%);
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 18px 34px rgba(15, 23, 42, 0.22);
+    }
+    .name-modal-title {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .name-modal-desc {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 14px;
+    }
+    .name-modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .name-modal-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: #b91c1c;
+      margin-top: 8px;
+    }
     @media (max-width: 900px) {
       .grid {
         grid-template-columns: 1fr;
@@ -159,6 +203,20 @@
     </section>
   </div>
 
+  <div id="nameModal" class="name-modal" aria-hidden="true">
+    <div class="name-modal-card" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+      <h3 id="nameModalTitle" class="name-modal-title">입장 이름 입력</h3>
+      <p class="name-modal-desc">회의실에서 표시할 이름을 입력해주세요.</p>
+      <input id="nameModalInput" type="text" maxlength="40" placeholder="예: 홍길동" list="nameSuggestions">
+      <datalist id="nameSuggestions"></datalist>
+      <div id="nameModalError" class="name-modal-error"></div>
+      <div class="name-modal-actions">
+        <button id="nameModalCancel" class="ghost" type="button">취소</button>
+        <button id="nameModalConfirm" type="button">입장하기</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const roomNameInput = document.getElementById('roomName');
     const createdByInput = document.getElementById('createdBy');
@@ -166,10 +224,40 @@
     const createStatus = document.getElementById('createStatus');
     const refreshBtn = document.getElementById('refreshBtn');
     const roomList = document.getElementById('roomList');
+    const nameModal = document.getElementById('nameModal');
+    const nameModalInput = document.getElementById('nameModalInput');
+    const nameSuggestions = document.getElementById('nameSuggestions');
+    const nameModalError = document.getElementById('nameModalError');
+    const nameModalCancel = document.getElementById('nameModalCancel');
+    const nameModalConfirm = document.getElementById('nameModalConfirm');
+    let pendingRoomCode = '';
+    let loadedNames = false;
 
     function setCreateStatus(text, isError = false) {
       createStatus.textContent = text;
       createStatus.style.color = isError ? '#b91c1c' : '#334155';
+    }
+
+    function renderNameSuggestions(names) {
+      const unique = [...new Set((names || []).map((item) => String(item || '').trim()).filter(Boolean))];
+      nameSuggestions.innerHTML = unique.map((name) => `<option value="${escapeHtml(name)}"></option>`).join('');
+    }
+
+    async function loadNameSuggestions() {
+      if (loadedNames) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/speakers');
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || '이름 목록을 불러오지 못했습니다.');
+        }
+        renderNameSuggestions(data.names || []);
+        loadedNames = true;
+      } catch (_) {
+        // 이름 목록 로딩 실패 시에도 직접 입력은 가능하도록 무시
+      }
     }
 
     function renderRooms(rooms) {
@@ -190,10 +278,47 @@
                 <span>${createdAt}</span>
               </div>
             </div>
-            <a class="enter" href="/meeting/${encodeURIComponent(room.room_code)}">입장하기</a>
+            <a class="enter" href="#" data-room-code="${escapeHtml(room.room_code)}">입장하기</a>
           </div>
         `;
       }).join('');
+    }
+
+    async function openNameModal(roomCode) {
+      pendingRoomCode = roomCode;
+      nameModalError.textContent = '';
+      nameModalInput.value = localStorage.getItem('meeting_display_name') || '';
+      await loadNameSuggestions();
+      nameModal.classList.add('show');
+      nameModal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => {
+        nameModalInput.focus();
+        nameModalInput.select();
+      }, 0);
+    }
+
+    function closeNameModal() {
+      pendingRoomCode = '';
+      nameModal.classList.remove('show');
+      nameModal.setAttribute('aria-hidden', 'true');
+      nameModalError.textContent = '';
+    }
+
+    function confirmNameAndEnter() {
+      const normalized = String(nameModalInput.value || '').trim().slice(0, 40);
+      if (!normalized) {
+        nameModalError.textContent = '이름을 입력해야 입장할 수 있습니다.';
+        nameModalInput.focus();
+        return;
+      }
+      if (!pendingRoomCode) {
+        closeNameModal();
+        return;
+      }
+      localStorage.setItem('meeting_display_name', normalized);
+      const target = `/meeting/${encodeURIComponent(pendingRoomCode)}?name=${encodeURIComponent(normalized)}`;
+      closeNameModal();
+      window.location.href = target;
     }
 
     function escapeHtml(value) {
@@ -256,11 +381,43 @@
 
     createRoomBtn.addEventListener('click', createRoom);
     refreshBtn.addEventListener('click', loadRooms);
+    roomList.addEventListener('click', (event) => {
+      const enterLink = event.target.closest('a.enter[data-room-code]');
+      if (!enterLink) {
+        return;
+      }
+      event.preventDefault();
+      const roomCode = enterLink.getAttribute('data-room-code');
+      if (!roomCode) {
+        return;
+      }
+      openNameModal(roomCode);
+    });
+
+    nameModalConfirm.addEventListener('click', confirmNameAndEnter);
+    nameModalCancel.addEventListener('click', closeNameModal);
+    nameModalInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        confirmNameAndEnter();
+      }
+    });
+    nameModal.addEventListener('click', (event) => {
+      if (event.target === nameModal) {
+        closeNameModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && nameModal.classList.contains('show')) {
+        closeNameModal();
+      }
+    });
+
     roomNameInput.addEventListener('keypress', (event) => {
       if (event.key === 'Enter') createRoom();
     });
 
     loadRooms();
+    loadNameSuggestions();
   </script>
 </body>
 </html>

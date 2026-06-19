@@ -173,6 +173,7 @@
       color: #1e293b;
     }
     .chat-bubble {
+      min-width: 140px;
       max-width: min(72%, 540px);
       border-radius: 12px;
       padding: 9px 11px;
@@ -300,6 +301,7 @@
   <script>
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const roomCode = '{{ room_code or "" }}';
+    const currentUserName = '{{ user_name or "참가자" }}';
 
     const koText = document.getElementById('koText');
     const jaText = document.getElementById('jaText');
@@ -570,7 +572,7 @@
 
     async function saveMeetingMessage({ speakerName, languageCode, originalText, translatedText }) {
       if (!roomCode) {
-        return;
+        return { message_id: null, message_at: null };
       }
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -587,6 +589,11 @@
         const payload = await res.json().catch(() => ({}));
         throw new Error(payload.error || '메시지 저장 실패');
       }
+      const payload = await res.json().catch(() => ({}));
+      return {
+        message_id: payload.message_id || null,
+        message_at: payload.message_at || null,
+      };
     }
 
     function getPreferredVoice(lang) {
@@ -724,23 +731,29 @@
         const translated = await requestTranslation(ko, 'ko', 'ja');
         koToJa.value = translated;
         appendLog(`KR -> JP: ${translated}`);
+        let savedMessageId = null;
+        let savedMessageAt = null;
         try {
-          await saveMeetingMessage({
-            speakerName: '한국어 화자',
+          const saved = await saveMeetingMessage({
+            speakerName: currentUserName,
             languageCode: 'ko',
             originalText: ko,
             translatedText: translated
           });
+          savedMessageId = saved.message_id;
+          savedMessageAt = saved.message_at;
         } catch (saveError) {
           appendLog(`저장 오류: ${saveError.message}`);
         }
         appendRoomMessage({
           side: 'right',
-          name: '한국어 화자',
+          name: currentUserName,
           originalText: ko,
           translatedText: translated,
           source: 'ko',
-          target: 'ja'
+          target: 'ja',
+          messageAt: savedMessageAt ? parseDbDateTime(savedMessageAt) : new Date(),
+          messageId: savedMessageId
         });
         speakText(translated, 'ja-JP');
         setStatus('번역 완료');
@@ -766,23 +779,29 @@
         const translated = await requestTranslation(ja, 'ja', 'ko');
         jaToKo.value = translated;
         appendLog(`JP -> KR: ${translated}`);
+        let savedMessageId = null;
+        let savedMessageAt = null;
         try {
-          await saveMeetingMessage({
-            speakerName: '日本語話者',
+          const saved = await saveMeetingMessage({
+            speakerName: currentUserName,
             languageCode: 'ja',
             originalText: ja,
             translatedText: translated
           });
+          savedMessageId = saved.message_id;
+          savedMessageAt = saved.message_at;
         } catch (saveError) {
           appendLog(`저장 오류: ${saveError.message}`);
         }
         appendRoomMessage({
           side: 'left',
-          name: '日本語話者',
+          name: currentUserName,
           originalText: ja,
           translatedText: translated,
           source: 'ja',
-          target: 'ko'
+          target: 'ko',
+          messageAt: savedMessageAt ? parseDbDateTime(savedMessageAt) : new Date(),
+          messageId: savedMessageId
         });
         speakText(translated, 'ko-KR');
         setStatus('번역 완료');
