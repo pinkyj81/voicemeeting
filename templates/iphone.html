@@ -75,6 +75,16 @@
       background: #fff;
       color: #0f172a;
     }
+    #koText {
+      min-height: 48px;
+    }
+    #jaText {
+      min-height: 48px;
+    }
+    #koToJa,
+    #jaToKo {
+      min-height: 48px;
+    }
     .btn-row {
       display: flex;
       gap: 8px;
@@ -95,11 +105,24 @@
       justify-content: center;
       font-family: inherit;
     }
+    .compact-btn {
+      padding: 10px 12px;
+      font-size: 14px;
+      border-radius: 12px;
+      min-width: 0;
+      flex: 0 0 auto;
+    }
     .primary {
       background: #1d4ed8;
       color: #fff;
       flex: 1;
       min-width: 120px;
+    }
+    .compact-primary {
+      flex: 0 0 auto;
+      min-width: 92px;
+      padding-left: 12px;
+      padding-right: 12px;
     }
     .dark {
       background: #334155;
@@ -262,17 +285,17 @@
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h2 style="margin: 0;">한국어 화자 입력</h2>
-        <button type="button" id="clearKo" class="ghost">지우기</button>
+        <button type="button" id="clearKo" class="ghost compact-btn">지우기</button>
       </div>
       <p>입력칸을 누른 뒤 iPhone 키보드의 마이크 버튼으로 받아쓰기하세요.</p>
       <textarea id="koText" placeholder="여기에 한국어 받아쓰기 결과를 입력하세요."></textarea>
       <div class="btn-row" style="margin-top: 10px;">
-        <button type="button" id="translateKoToJaBtn" class="primary">번역</button>
+        <button type="button" id="translateKoToJaBtn" class="primary compact-primary">번역</button>
       </div>
 
       <textarea id="koToJa" placeholder="한국어 문장이 일본어로 번역됩니다." readonly></textarea>
       <div class="btn-row">
-        <button type="button" id="speakJaBtn" class="dark">日本語結果を読む</button>
+        <button type="button" id="speakJaBtn" class="dark compact-btn">日本語結果を読む</button>
       </div>
     </section>
 
@@ -280,18 +303,18 @@
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h2 style="margin: 0;">日本語話者入力</h2>
-        <button type="button" id="clearJa" class="ghost">削除</button>
+        <button type="button" id="clearJa" class="ghost compact-btn">削除</button>
       </div>
       <p>入力欄をタップして、iPhoneキーボードのマイクで音声入力してください。</p>
       <p class="warn">입력 전에 iPhone 키보드를 일본어로 전환하세요. (지구본 키 길게 누르기)</p>
       <textarea id="jaText" placeholder="ここに日本語の音声入力結果を入れてください。"></textarea>
       <div class="btn-row" style="margin-top: 10px;">
-        <button type="button" id="translateJaToKoBtn" class="primary">번역</button>
+        <button type="button" id="translateJaToKoBtn" class="primary compact-primary">翻訳</button>
       </div>
 
       <textarea id="jaToKo" placeholder="일본어 문장이 한국어로 번역됩니다." readonly></textarea>
       <div class="btn-row">
-        <button type="button" id="speakKoBtn" class="dark">한국어 결과 읽기</button>
+        <button type="button" id="speakKoBtn" class="dark compact-btn">한국어 결과 읽기</button>
       </div>
     </section>
 
@@ -324,6 +347,7 @@
     const translateJaToKoBtn = document.getElementById('translateJaToKoBtn');
     const speakKoBtn = document.getElementById('speakKoBtn');
     const speakJaBtn = document.getElementById('speakJaBtn');
+    let activeSpeechKey = null;
     const enterRoomBtn = document.getElementById('enterRoomBtn');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const clearRoomChatBtn = document.getElementById('clearRoomChatBtn');
@@ -485,17 +509,35 @@
       return null;
     }
 
-    function speakText(text, lang) {
+    function speakText(text, lang, speechKey) {
       if (!text || !window.speechSynthesis) {
         return;
       }
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        if (activeSpeechKey === speechKey) {
+          window.speechSynthesis.cancel();
+          activeSpeechKey = null;
+          return;
+        }
+        window.speechSynthesis.cancel();
+      }
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
       const preferredVoice = getPreferredVoice(lang);
       if (preferredVoice) {
         utterance.voice = preferredVoice;
       }
+      activeSpeechKey = speechKey;
+      utterance.onend = () => {
+        if (activeSpeechKey === speechKey) {
+          activeSpeechKey = null;
+        }
+      };
+      utterance.onerror = () => {
+        if (activeSpeechKey === speechKey) {
+          activeSpeechKey = null;
+        }
+      };
       window.speechSynthesis.speak(utterance);
     }
 
@@ -541,8 +583,8 @@
       roomChat.appendChild(roomDateLine);
     });
 
-    speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR'));
-    speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP'));
+    speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR', 'ko'));
+    speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP', 'ja'));
 
     jaText.addEventListener('focus', () => {
       setStatus('안내: 일본어 칸은 일본어 키보드(지구본 키)로 전환 후 입력하세요.');

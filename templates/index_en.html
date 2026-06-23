@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KR-JP Voice Meeting Translator</title>
+  <title>KR-EN Voice Meeting Translator</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -94,17 +94,17 @@
       flex: 1;
       min-width: 140px;
     }
-    .ja-controls {
+    .en-controls {
       flex-wrap: nowrap;
       gap: 6px;
     }
-    .ja-controls button {
+    .en-controls button {
       padding: 8px 10px;
       font-size: 13px;
       min-width: 0;
       white-space: nowrap;
     }
-    .ja-controls .push-right {
+    .en-controls .push-right {
       margin-left: auto;
     }
     textarea {
@@ -121,11 +121,11 @@
     #koText {
       min-height: 64px;
     }
-    #jaText {
+    #enText {
       min-height: 64px;
     }
-    #koToJa,
-    #jaToKo {
+    #koToEn,
+    #enToKo {
       min-height: 64px;
     }
     .status {
@@ -258,7 +258,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>한일 회의 음성 번역</h1>
+    <h1>한국어-영어 음성 번역</h1>
     <p class="desc">각자 말한 뒤 번역 버튼을 누르면 서로 언어로 번역되고 음성으로 재생됩니다.</p>
     {% if room_code %}
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
@@ -286,27 +286,27 @@
           <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
             <button id="translateKoBtn" class="primary-wide">번역</button>
           </div>
-          <textarea id="koToJa" placeholder="한국어 발화가 일본어로 번역됩니다." readonly></textarea>
+          <textarea id="koToEn" placeholder="한국어 발화가 영어로 번역됩니다." readonly></textarea>
           <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
-            <button id="speakJaBtn" class="alt">日本語結果を読む</button>
+            <button id="speakEnBtn" class="alt">Read English Result</button>
           </div>
         </section>
 
         <section class="card">
           <div class="btn-row" style="align-items: center; margin-bottom: 8px;">
-            <h2 style="margin: 0;">日本語話者</h2>
+            <h2 style="margin: 0;">English Speaker</h2>
           </div>
-          <p>音声認識言語: 日本語 (ja-JP)</p>
-          <div class="btn-row ja-controls">
-            <button id="startJa">日本語の音声入力開始</button>
-            <button id="stopJa" class="alt">停止</button>
-            <button id="clearJa" class="ghost push-right">テキスト削除</button>
+          <p>Speech Recognition Language: English (en-US)</p>
+          <div class="btn-row en-controls">
+            <button id="startEn">Start English Speech Input</button>
+            <button id="stopEn" class="alt">Stop</button>
+            <button id="clearEn" class="ghost push-right">Clear Text</button>
           </div>
-          <textarea id="jaText" placeholder="ここに日本語の音声認識結果が表示されます。"></textarea>
+          <textarea id="enText" placeholder="English speech recognition results will be displayed here."></textarea>
           <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
-            <button id="translateJaBtn" class="primary-wide">翻訳</button>
+            <button id="translateEnBtn" class="primary-wide">Translate</button>
           </div>
-          <textarea id="jaToKo" placeholder="일본어 발화가 한국어로 번역됩니다." readonly></textarea>
+          <textarea id="enToKo" placeholder="영어 발화가 한국어로 번역됩니다." readonly></textarea>
           <div class="btn-row" style="margin-top: 10px; margin-bottom: 0;">
             <button id="speakKoBtn" class="alt">한국어 결과 읽기</button>
           </div>
@@ -329,30 +329,30 @@
     const currentUserName = '{{ user_name or "참가자" }}';
 
     const koText = document.getElementById('koText');
-    const jaText = document.getElementById('jaText');
-    const koToJa = document.getElementById('koToJa');
-    const jaToKo = document.getElementById('jaToKo');
+    const enText = document.getElementById('enText');
+    const koToEn = document.getElementById('koToEn');
+    const enToKo = document.getElementById('enToKo');
     const statusEl = document.getElementById('status');
 
     const startKo = document.getElementById('startKo');
     const stopKo = document.getElementById('stopKo');
     const clearKo = document.getElementById('clearKo');
 
-    const startJa = document.getElementById('startJa');
-    const stopJa = document.getElementById('stopJa');
-    const clearJa = document.getElementById('clearJa');
+    const startEn = document.getElementById('startEn');
+    const stopEn = document.getElementById('stopEn');
+    const clearEn = document.getElementById('clearEn');
 
     const translateKoBtn = document.getElementById('translateKoBtn');
-    const translateJaBtn = document.getElementById('translateJaBtn');
+    const translateEnBtn = document.getElementById('translateEnBtn');
     const speakKoBtn = document.getElementById('speakKoBtn');
-    const speakJaBtn = document.getElementById('speakJaBtn');
+    const speakEnBtn = document.getElementById('speakEnBtn');
     let activeSpeechKey = null;
     const roomStatus = document.getElementById('roomStatus');
     const roomChat = document.getElementById('roomChat');
     const roomDateLine = document.getElementById('roomDateLine');
 
     let koRecognition = null;
-    let jaRecognition = null;
+    let enRecognition = null;
     let roomSessionStartAt = new Date();
     let lastLoadedMessageId = 0;
     const renderedMessageIds = new Set();
@@ -370,8 +370,8 @@
 
     function toSpeechLang(langOrCode) {
       const value = String(langOrCode || '').toLowerCase();
-      if (value.startsWith('ja')) {
-        return 'ja-JP';
+      if (value.startsWith('en')) {
+        return 'en-US';
       }
       return 'ko-KR';
     }
@@ -465,14 +465,14 @@
     function applyMessagesToChat(messages) {
       for (const msg of messages) {
         const side = msg.language_code === 'ko' ? 'right' : 'left';
-        const fallbackName = msg.language_code === 'ko' ? '한국어 화자' : '日本語話者';
+        const fallbackName = msg.language_code === 'ko' ? '한국어 화자' : 'English Speaker';
         appendRoomMessage({
           side,
           name: msg.speaker_name || fallbackName,
           originalText: msg.original_text || '',
           translatedText: msg.translated_text || '',
           source: msg.language_code,
-          target: msg.language_code === 'ko' ? 'ja' : 'ko',
+          target: msg.language_code === 'ko' ? 'en' : 'ko',
           messageAt: parseDbDateTime(msg.message_at),
           messageId: msg.message_id
         });
@@ -634,7 +634,7 @@
       const target = String(lang || '').toLowerCase();
       const langPrefix = target.split('-')[0];
       const keywordMap = {
-        'ja-jp': ['japanese', 'japan', 'ja-jp', 'kyoko', 'otoya', 'haruka', 'nanami'],
+        'en-us': ['english', 'en-us', 'google us', 'microsoft mark'],
         'ko-kr': ['korean', 'korea', 'ko-kr', 'seoyeon', 'sunhi', 'jihun']
       };
       const keywords = keywordMap[target] || [];
@@ -710,11 +710,11 @@
       appendLog('브라우저가 음성 인식을 지원하지 않습니다.');
       startKo.disabled = true;
       stopKo.disabled = true;
-      startJa.disabled = true;
-      stopJa.disabled = true;
+      startEn.disabled = true;
+      stopEn.disabled = true;
     } else {
       koRecognition = createRecognizer('ko-KR', koText, '한국어');
-      jaRecognition = createRecognizer('ja-JP', jaText, '일본어');
+      enRecognition = createRecognizer('en-US', enText, 'English');
 
       startKo.addEventListener('click', async () => {
         try {
@@ -733,34 +733,34 @@
         koRecognition.stop();
       });
 
-      startJa.addEventListener('click', async () => {
+      startEn.addEventListener('click', async () => {
         try {
           await ensureMicPermission();
-          jaRecognition.start();
+          enRecognition.start();
         } catch (error) {
           if (error && error.name === 'InvalidStateError') {
             return;
           }
           const msg = error?.message || '알 수 없는 오류';
-          setStatus(`일본어 음성 인식 시작 실패: ${msg}`);
-          appendLog(`일본어 STT 시작 실패: ${msg}`);
+          setStatus(`영어 음성 인식 시작 실패: ${msg}`);
+          appendLog(`영어 STT 시작 실패: ${msg}`);
         }
       });
-      stopJa.addEventListener('click', () => {
-        jaRecognition.stop();
+      stopEn.addEventListener('click', () => {
+        enRecognition.stop();
       });
     }
 
     clearKo.addEventListener('click', () => clearTextArea(koText));
-    clearJa.addEventListener('click', () => clearTextArea(jaText));
+    clearEn.addEventListener('click', () => clearTextArea(enText));
 
     roomDateLine.textContent = formatDateLine(roomSessionStartAt);
     roomStatus.textContent = `입장 시간: ${roomSessionStartAt.toLocaleString('ko-KR')}`;
     loadMeetingMessages();
     startMessagePolling();
 
-    speakKoBtn.addEventListener('click', () => speakText(jaToKo.value.trim(), 'ko-KR', 'ko'));
-    speakJaBtn.addEventListener('click', () => speakText(koToJa.value.trim(), 'ja-JP', 'ja'));
+    speakKoBtn.addEventListener('click', () => speakText(enToKo.value.trim(), 'ko-KR', 'ko'));
+    speakEnBtn.addEventListener('click', () => speakText(koToEn.value.trim(), 'en-US', 'en'));
 
     translateKoBtn.addEventListener('click', async () => {
       const ko = koText.value.trim();
@@ -769,13 +769,13 @@
         return;
       }
 
-      setStatus('한국어 -> 일본어 번역 중...');
+      setStatus('한국어 -> 영어 번역 중...');
       translateKoBtn.disabled = true;
 
       try {
-        const translated = await requestTranslation(ko, 'ko', 'ja');
-        koToJa.value = translated;
-        appendLog(`KR -> JP: ${translated}`);
+        const translated = await requestTranslation(ko, 'ko', 'en');
+        koToEn.value = translated;
+        appendLog(`KR -> EN: ${translated}`);
         let savedMessageId = null;
         let savedMessageAt = null;
         try {
@@ -796,11 +796,11 @@
           originalText: ko,
           translatedText: translated,
           source: 'ko',
-          target: 'ja',
+          target: 'en',
           messageAt: savedMessageAt ? parseDbDateTime(savedMessageAt) : new Date(),
           messageId: savedMessageId
         });
-        speakText(translated, 'ja-JP');
+        speakText(translated, 'en-US');
         setStatus('번역 완료');
       } catch (error) {
         setStatus(`오류: ${error.message}`);
@@ -810,27 +810,27 @@
       }
     });
 
-    translateJaBtn.addEventListener('click', async () => {
-      const ja = jaText.value.trim();
-      if (!ja) {
-        setStatus('번역할 일본어 텍스트가 없습니다.');
+    translateEnBtn.addEventListener('click', async () => {
+      const en = enText.value.trim();
+      if (!en) {
+        setStatus('번역할 영어 텍스트가 없습니다.');
         return;
       }
 
-      setStatus('일본어 -> 한국어 번역 중...');
-      translateJaBtn.disabled = true;
+      setStatus('영어 -> 한국어 번역 중...');
+      translateEnBtn.disabled = true;
 
       try {
-        const translated = await requestTranslation(ja, 'ja', 'ko');
-        jaToKo.value = translated;
-        appendLog(`JP -> KR: ${translated}`);
+        const translated = await requestTranslation(en, 'en', 'ko');
+        enToKo.value = translated;
+        appendLog(`EN -> KR: ${translated}`);
         let savedMessageId = null;
         let savedMessageAt = null;
         try {
           const saved = await saveMeetingMessage({
             speakerName: currentUserName,
-            languageCode: 'ja',
-            originalText: ja,
+            languageCode: 'en',
+            originalText: en,
             translatedText: translated
           });
           savedMessageId = saved.message_id;
@@ -841,9 +841,9 @@
         appendRoomMessage({
           side: 'left',
           name: currentUserName,
-          originalText: ja,
+          originalText: en,
           translatedText: translated,
-          source: 'ja',
+          source: 'en',
           target: 'ko',
           messageAt: savedMessageAt ? parseDbDateTime(savedMessageAt) : new Date(),
           messageId: savedMessageId
@@ -854,7 +854,7 @@
         setStatus(`오류: ${error.message}`);
         appendLog(`번역 오류: ${error.message}`);
       } finally {
-        translateJaBtn.disabled = false;
+        translateEnBtn.disabled = false;
       }
     });
 

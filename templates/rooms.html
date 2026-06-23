@@ -122,6 +122,35 @@
       font-size: 13px;
       white-space: nowrap;
     }
+    .room-item-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .room-item-checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #1d4ed8;
+    }
+    .room-item.selected {
+      background: #dbeafe;
+      border-color: #1d4ed8;
+    }
+    button.delete-btn {
+      background: #b91c1c;
+      font-size: 13px;
+      padding: 8px 12px;
+    }
+    button.delete-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    .delete-count {
+      font-size: 13px;
+      color: #475569;
+      margin-left: 6px;
+    }
     .name-modal {
       position: fixed;
       inset: 0;
@@ -191,13 +220,29 @@
         <input id="createdBy" type="text" placeholder="생성자 (선택)">
         <button id="createRoomBtn">회의실 생성</button>
       </div>
+      <div style="margin-top: 12px; display: flex; gap: 60px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap;">
+          <input type="radio" id="langKoJa" name="roomLanguage" value="ko-ja" checked>
+          <span style="font-size: 14px;">일본어</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap;">
+          <input type="radio" id="langKoEn" name="roomLanguage" value="ko-en">
+          <span style="font-size: 14px;">영어</span>
+        </label>
+      </div>
       <p class="status" id="createStatus"></p>
     </section>
 
     <section class="card">
       <div class="toolbar">
         <h2 style="margin: 0; font-size: 20px;">회의실 목록</h2>
-        <button id="refreshBtn" class="ghost">새로고침</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="refreshBtn" class="ghost">새로고침</button>
+          <button id="deleteSelectedBtn" class="delete-btn" disabled>
+            선택 삭제
+            <span id="deleteCount" class="delete-count"></span>
+          </button>
+        </div>
       </div>
       <div id="roomList" class="room-list"></div>
     </section>
@@ -224,6 +269,8 @@
     const createStatus = document.getElementById('createStatus');
     const refreshBtn = document.getElementById('refreshBtn');
     const roomList = document.getElementById('roomList');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const deleteCount = document.getElementById('deleteCount');
     const nameModal = document.getElementById('nameModal');
     const nameModalInput = document.getElementById('nameModalInput');
     const nameSuggestions = document.getElementById('nameSuggestions');
@@ -232,6 +279,7 @@
     const nameModalConfirm = document.getElementById('nameModalConfirm');
     let pendingRoomCode = '';
     let loadedNames = false;
+    let selectedRoomCodes = new Set();
 
     function setCreateStatus(text, isError = false) {
       createStatus.textContent = text;
@@ -269,13 +317,19 @@
       roomList.innerHTML = rooms.map((room) => {
         const createdBy = room.created_by ? `생성자: ${escapeHtml(room.created_by)}` : '생성자: -';
         const createdAt = room.created_at ? `생성일시: ${escapeHtml(room.created_at)}` : '';
+        const languageDisplay = room.language === 'ko-en' ? '영어' : '일본어';
+        const isSelected = selectedRoomCodes.has(room.room_code);
         return `
-          <div class="room-item">
-            <div>
-              <div class="room-title">${escapeHtml(room.room_name)} <span style="font-size:13px; color:#475569;">(#${escapeHtml(room.room_code)})</span></div>
-              <div class="room-meta">
-                <span>${createdBy}</span>
-                <span>${createdAt}</span>
+          <div class="room-item${isSelected ? ' selected' : ''}" data-room-code="${escapeHtml(room.room_code)}">
+            <div class="room-item-checkbox">
+              <input type="checkbox" class="room-checkbox" data-room-code="${escapeHtml(room.room_code)}"${isSelected ? ' checked' : ''}>
+              <div>
+                <div class="room-title">${escapeHtml(room.room_name)} <span style="font-size:13px; color:#475569;">(#${escapeHtml(room.room_code)})</span></div>
+                <div class="room-meta">
+                  <span>${createdBy}</span>
+                  <span>${createdAt}</span>
+                  <span style="color: #1d4ed8; font-weight: 600;">언어: ${languageDisplay}</span>
+                </div>
               </div>
             </div>
             <a class="enter" href="#" data-room-code="${escapeHtml(room.room_code)}">입장하기</a>
@@ -347,6 +401,7 @@
     async function createRoom() {
       const roomName = roomNameInput.value.trim();
       const createdBy = createdByInput.value.trim();
+      const language = document.querySelector('input[name="roomLanguage"]:checked').value;
 
       if (!roomName) {
         setCreateStatus('회의실 이름을 입력해주세요.', true);
@@ -361,7 +416,7 @@
         const response = await fetch('/api/rooms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ room_name: roomName, created_by: createdBy })
+          body: JSON.stringify({ room_name: roomName, created_by: createdBy, language: language })
         });
 
         const data = await response.json();
@@ -379,8 +434,66 @@
       }
     }
 
+    function updateDeleteButtonState() {
+      const count = selectedRoomCodes.size;
+      deleteSelectedBtn.disabled = count === 0;
+      deleteCount.textContent = count > 0 ? `(${count})` : '';
+    }
+
+    async function deleteSelectedRooms() {
+      if (selectedRoomCodes.size === 0) {
+        return;
+      }
+
+      const codes = Array.from(selectedRoomCodes);
+      const confirmMsg = `${codes.length}개의 회의실을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`;
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      deleteSelectedBtn.disabled = true;
+      try {
+        const response = await fetch('/api/rooms', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room_codes: codes })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || '삭제 실패');
+        }
+
+        selectedRoomCodes.clear();
+        updateDeleteButtonState();
+        await loadRooms();
+        alert('선택된 회의실이 삭제되었습니다.');
+      } catch (error) {
+        alert(`삭제 중 오류: ${error.message}`);
+      } finally {
+        deleteSelectedBtn.disabled = false;
+      }
+    }
     createRoomBtn.addEventListener('click', createRoom);
-    refreshBtn.addEventListener('click', loadRooms);
+    deleteSelectedBtn.addEventListener('click', deleteSelectedRooms);
+    roomList.addEventListener('change', (event) => {
+      const checkbox = event.target.closest('input[type="checkbox"].room-checkbox');
+      if (!checkbox) {
+        return;
+      }
+      const roomCode = checkbox.getAttribute('data-room-code');
+      if (!roomCode) {
+        return;
+      }
+      if (checkbox.checked) {
+        selectedRoomCodes.add(roomCode);
+        checkbox.closest('.room-item').classList.add('selected');
+      } else {
+        selectedRoomCodes.delete(roomCode);
+        checkbox.closest('.room-item').classList.remove('selected');
+      }
+      updateDeleteButtonState();
+    });
     roomList.addEventListener('click', (event) => {
       const enterLink = event.target.closest('a.enter[data-room-code]');
       if (!enterLink) {
@@ -414,6 +527,12 @@
 
     roomNameInput.addEventListener('keypress', (event) => {
       if (event.key === 'Enter') createRoom();
+    });
+
+    refreshBtn.addEventListener('click', () => {
+      selectedRoomCodes.clear();
+      updateDeleteButtonState();
+      loadRooms();
     });
 
     loadRooms();
